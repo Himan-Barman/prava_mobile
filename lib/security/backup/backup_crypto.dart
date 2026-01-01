@@ -51,7 +51,7 @@ final class BackupCrypto {
     final sodium = await SodiumLoader.sodium;
 
     return sodium.crypto. pwhash. call(
-      password: passphrase. codeUnits,
+      password: Int8List.fromList(passphrase. codeUnits),
       salt: salt,
       outLen: 32,
       opsLimit: sodium.crypto.pwhash.opsLimitModerate,
