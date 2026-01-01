@@ -1,5 +1,5 @@
 // Device identity
-import 'package:equatable/equatable. dart';
+import 'package:equatable/equatable.dart';
 
 /// Device trust levels
 enum DeviceTrust {

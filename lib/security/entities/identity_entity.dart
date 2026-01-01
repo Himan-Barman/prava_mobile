@@ -1,5 +1,5 @@
 // Identity entity (Isar)
-import 'package: isar/isar.dart';
+import 'package:isar/isar.dart';
 
 part 'identity_entity.g.dart';
 

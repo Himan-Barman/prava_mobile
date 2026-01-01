@@ -6,8 +6,8 @@ import 'bridge/sodium_loader.dart';
 import 'bridge/memory_allocator.dart';
 import 'bridge/native_api.dart';
 import 'storage/vault.dart';
-import 'threat/root_detection. dart';
-import 'threat/debugger_check. dart';
+import 'threat/root_detection.dart';
+import 'threat/debugger_check.dart';
 
 /// ============================================================
 /// Security Module Initialization

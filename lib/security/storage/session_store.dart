@@ -2,10 +2,10 @@
 import 'dart:convert';
 import 'dart: typed_data';
 
-import 'package:isar/isar. dart';
+import 'package:isar/isar.dart';
 
 import '../entities/session_entity.dart';
-import '../ratchet/double_ratchet. dart';
+import '../ratchet/double_ratchet.dart';
 import 'vault.dart';
 
 /// ============================================================
