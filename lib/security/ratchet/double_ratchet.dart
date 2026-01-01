@@ -115,10 +115,12 @@ final class DoubleRatchet {
     final myRatchetKeyPair = await KeyGeneration. generateRatchetKeyPair();
 
     // Perform initial DH
-    final dhOutput = sodium.crypto.scalarMult(
-      n: myRatchetKeyPair.secretKey,
-      p: theirRatchetPublicKey,
+    final sharedKey = sodium.crypto.box.precalculate(
+      publicKey: theirRatchetPublicKey,
+      secretKey: myRatchetKeyPair.secretKey,
     );
+    final dhOutput = sharedKey.extractBytes();
+    sharedKey.dispose();
 
     // Derive root key and sending chain key
     final rootKeyBytes = sharedSecret.extractBytes();
@@ -348,10 +350,12 @@ final class DoubleRatchet {
     _theirRatchetPublicKey = Uint8List. fromList(theirNewRatchetPublicKey);
 
     // DH with our current private key and their new public key
-    final dhOutput1 = sodium.crypto.scalarMult(
-      n: _myRatchetKeyPair!.secretKey,
-      p: theirNewRatchetPublicKey,
+    final sharedKey1 = sodium.crypto.box.precalculate(
+      publicKey: theirNewRatchetPublicKey,
+      secretKey: _myRatchetKeyPair!.secretKey,
     );
+    final dhOutput1 = sharedKey1.extractBytes();
+    sharedKey1.dispose();
 
     // Derive new receiving chain key
     final derived1 = await Hashing. kdfRootKey(
@@ -366,10 +370,12 @@ final class DoubleRatchet {
     _myRatchetKeyPair = await KeyGeneration.generateRatchetKeyPair();
 
     // DH with our new private key and their public key
-    final dhOutput2 = sodium. crypto.scalarMult(
-      n: _myRatchetKeyPair! .secretKey,
-      p: theirNewRatchetPublicKey,
+    final sharedKey2 = sodium.crypto.box.precalculate(
+      publicKey: theirNewRatchetPublicKey,
+      secretKey: _myRatchetKeyPair!.secretKey,
     );
+    final dhOutput2 = sharedKey2.extractBytes();
+    sharedKey2.dispose();
 
     // Derive new sending chain key
     final derived2 = await Hashing.kdfRootKey(
