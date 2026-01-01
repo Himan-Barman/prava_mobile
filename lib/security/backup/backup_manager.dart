@@ -1,7 +1,7 @@
 // Backup lifecycle manager
 import 'dart:typed_data';
 
-import '../crypto/random_generator. dart';
+import '../crypto/random_generator.dart';
 import '../storage/identity_store.dart';
 import '../storage/prekey_store.dart';
 import '../storage/session_store.dart';

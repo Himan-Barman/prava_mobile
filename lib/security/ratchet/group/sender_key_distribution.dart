@@ -1,7 +1,7 @@
 // Sender key distribution
 import 'dart:typed_data';
 
-import 'sender_key_state. dart';
+import 'sender_key_state.dart';
 
 /// ============================================================
 /// Sender Key Distribution

@@ -1,14 +1,14 @@
 // Encrypted vault
 import 'dart:async';
 
-import 'package: isar/isar. dart';
+import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../entities/identity_entity. dart';
+import '../entities/identity_entity.dart';
 import '../entities/prekey_entity.dart';
-import '../entities/sender_key_entity. dart';
+import '../entities/sender_key_entity.dart';
 import '../entities/session_entity.dart';
-import '../entities/signed_prekey_entity. dart';
+import '../entities/signed_prekey_entity.dart';
 
 /// ============================================================
 /// Vault - Secure Encrypted Database

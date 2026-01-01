@@ -1,7 +1,7 @@
 // Chain key derivation
 import 'dart:typed_data';
 
-import 'package:sodium_libs/sodium_libs. dart';
+import 'package:sodium_libs/sodium_libs.dart';
 
 import '../bridge/sodium_loader.dart';
 import '../crypto/hashing.dart';

@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 
-import 'package: sodium_libs/sodium_libs. dart';
+import 'package:sodium_libs/sodium_libs.dart';
 
 import '../bridge/sodium_loader.dart';
 import '../crypto/hashing.dart';
 import '../crypto/key_generation.dart';
-import 'chain_key. dart';
-import 'message_keys. dart';
+import 'chain_key.dart';
+import 'message_keys.dart';
 import 'skipped_keys.dart';
 
 /// ============================================================

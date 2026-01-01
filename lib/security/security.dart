@@ -49,10 +49,10 @@ export 'ratchet/group/sender_key_distribution.dart';
 // STORAGE LAYER
 // ─────────────────────────────────────────────────────────────
 export 'storage/vault.dart';
-export 'storage/identity_store. dart';
+export 'storage/identity_store.dart';
 export 'storage/session_store.dart';
-export 'storage/prekey_store. dart';
-export 'storage/signed_prekey_store. dart';
+export 'storage/prekey_store.dart';
+export 'storage/signed_prekey_store.dart';
 
 // ─────────────────────────────────────────────────────────────
 // DATABASE ENTITIES
@@ -81,22 +81,22 @@ export 'backup/backup_payload.dart';
 // MULTI-DEVICE
 // ─────────────────────────────────────────────────────────────
 export 'device/device_identity.dart';
-export 'device/device_registry. dart';
+export 'device/device_registry.dart';
 export 'device/device_bundle.dart';
 export 'device/multi_device_manager.dart';
 
 // ─────────────────────────────────────────────────────────────
 // TRANSPORT SECURITY
 // ─────────────────────────────────────────────────────────────
-export 'transport/cert_pinning. dart';
-export 'transport/traffic_obfuscation. dart';
+export 'transport/cert_pinning.dart';
+export 'transport/traffic_obfuscation.dart';
 export 'transport/packet_padding.dart';
 
 // ─────────────────────────────────────────────────────────────
 // PRIVACY
 // ─────────────────────────────────────────────────────────────
 export 'privacy/contact_hash.dart';
-export 'privacy/metadata_strip. dart';
+export 'privacy/metadata_strip.dart';
 
 // ─────────────────────────────────────────────────────────────
 // THREAT DETECTION
@@ -114,5 +114,5 @@ export 'transparency/merkle_tree.dart';
 // PROTOCOL
 // ─────────────────────────────────────────────────────────────
 export 'protocol/crypto_tasks.dart';
-export 'protocol/message_envelope. dart';
+export 'protocol/message_envelope.dart';
 export 'protocol/key_distribution.dart';

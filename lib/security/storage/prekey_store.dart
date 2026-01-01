@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:isar/isar.dart';
 
 import '../entities/prekey_entity.dart';
-import 'vault. dart';
+import 'vault.dart';
 
 /// ============================================================
 /// PreKey Store
