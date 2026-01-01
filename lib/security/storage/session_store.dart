@@ -1,11 +1,11 @@
 // Session state storage
 import 'dart:convert';
-import 'dart: typed_data';
+import 'dart:typed_data';
 
-import 'package:isar/isar. dart';
+import 'package:isar/isar.dart';
 
 import '../entities/session_entity.dart';
-import '../ratchet/double_ratchet. dart';
+import '../ratchet/double_ratchet.dart';
 import 'vault.dart';
 
 /// ============================================================
@@ -165,7 +165,7 @@ final class SessionStore {
   /// Get all active sessions
   static Future<List<SessionEntity>> getActiveSessions() async {
     return Vault.read((db) async {
-      return db. sessionEntitys
+      return db.sessionEntitys
           .filter()
           .statusEqualTo(SessionStatus.active)
           .findAll();
@@ -206,7 +206,7 @@ final class SessionStore {
   /// Get session count
   static Future<int> getCount() async {
     return Vault.read((db) async {
-      return db. sessionEntitys.count();
+      return db.sessionEntitys.count();
     });
   }
 

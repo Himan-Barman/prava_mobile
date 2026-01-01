@@ -1,7 +1,7 @@
 // Sender key state
 import 'dart:typed_data';
 
-import 'package: sodium_libs/sodium_libs. dart';
+import 'package:sodium_libs/sodium_libs.dart';
 
 import '../../bridge/sodium_loader.dart';
 
@@ -126,8 +126,8 @@ class SenderKeyState {
     final sodium = await SodiumLoader.sodium;
 
     // Derive message key:  HMAC(chainKey, 0x01)
-    final messageKey = sodium.crypto. genericHash(
-      message:  Uint8List.fromList([0x01, .. ._chainKey]),
+    final messageKey = sodium.crypto.genericHash(
+      message:  Uint8List.fromList([0x01, ..._chainKey]),
       outLen: 32,
     );
 

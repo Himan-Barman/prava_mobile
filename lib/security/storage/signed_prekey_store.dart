@@ -31,7 +31,7 @@ final class SignedPreKeyStore {
   /// Get signed pre-key by ID
   static Future<SignedPreKeyEntity? > getSignedPreKey(int keyId) async {
     return Vault.read((db) async {
-      return db. signedPreKeyEntitys
+      return db.signedPreKeyEntitys
           .filter()
           .keyIdEqualTo(keyId)
           .findFirst();

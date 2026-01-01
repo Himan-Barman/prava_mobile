@@ -1,7 +1,7 @@
 // TLS certificate pinning
 import 'dart:io';
 
-import 'package: crypto/crypto.dart';
+import 'package:crypto/crypto.dart';
 
 /// ============================================================
 /// Certificate Pinning

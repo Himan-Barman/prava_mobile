@@ -1,7 +1,7 @@
 // Backup lifecycle manager
 import 'dart:typed_data';
 
-import '../crypto/random_generator. dart';
+import '../crypto/random_generator.dart';
 import '../storage/identity_store.dart';
 import '../storage/prekey_store.dart';
 import '../storage/session_store.dart';
@@ -79,7 +79,7 @@ final class BackupManager {
 
     // 8. Build final format:  magic + version + salt + encrypted
     return Uint8List. fromList([
-      .. ._magic,
+      ..._magic,
       _formatVersion,
       ... salt,
       ... encrypted,

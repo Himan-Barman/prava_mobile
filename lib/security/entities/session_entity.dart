@@ -1,5 +1,5 @@
 // Session entity
-import 'package: isar/isar.dart';
+import 'package:isar/isar.dart';
 
 part 'session_entity.g.dart';
 

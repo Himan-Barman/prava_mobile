@@ -1,7 +1,7 @@
 // LibSodium initialization
 import 'dart:async';
 
-import 'package: sodium_libs/sodium_libs. dart';
+import 'package:sodium_libs/sodium_libs.dart';
 
 /// ============================================================
 /// LibSodium Loader - Production Grade

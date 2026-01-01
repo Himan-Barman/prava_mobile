@@ -39,7 +39,7 @@ final class RandomGenerator {
   /// Generate random bytes synchronously (requires prior init)
   static Uint8List bytesSync(int length) {
     _validateLength(length);
-    return SodiumLoader. sodiumSync.randombytes.buf(length);
+    return SodiumLoader.sodiumSync.randombytes.buf(length);
   }
 
   /// Fill existing buffer with random bytes
@@ -62,7 +62,7 @@ final class RandomGenerator {
     if (upperBound <= 0) {
       throw ArgumentError('Upper bound must be positive: $upperBound');
     }
-    final sodium = await SodiumLoader. sodium;
+    final sodium = await SodiumLoader.sodium;
     return sodium.randombytes.uniform(upperBound);
   }
 
@@ -131,7 +131,7 @@ final class RandomGenerator {
   /// Generate registration ID (Signal protocol)
   static Future<int> registrationId() async {
     // 14-bit random value (0 to 16380)
-    return uniform(16380) + 1;
+    return await uniform(16380) + 1;
   }
 
   /// Convert bytes to hex string

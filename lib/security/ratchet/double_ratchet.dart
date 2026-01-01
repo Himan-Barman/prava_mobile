@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 
-import 'package: sodium_libs/sodium_libs. dart';
+import 'package:sodium_libs/sodium_libs.dart';
 
 import '../bridge/sodium_loader.dart';
 import '../crypto/hashing.dart';
 import '../crypto/key_generation.dart';
-import 'chain_key. dart';
-import 'message_keys. dart';
+import 'chain_key.dart';
+import 'message_keys.dart';
 import 'skipped_keys.dart';
 
 /// ============================================================
@@ -82,7 +82,7 @@ final class DoubleRatchet {
         _sendingChainLength = sendingChainLength,
         _receivingChainLength = receivingChainLength,
         _previousSendingChainLength = previousSendingChainLength,
-        _skippedKeys = skippedKeys ??  SkippedMessageKeys();
+        _skippedKeys = skippedKeys ?? SkippedMessageKeys();
 
   /// My current ratchet public key
   Uint8List?  get myRatchetPublicKey => _myRatchetKeyPair?.publicKey;
@@ -348,7 +348,7 @@ final class DoubleRatchet {
     _theirRatchetPublicKey = Uint8List. fromList(theirNewRatchetPublicKey);
 
     // DH with our current private key and their new public key
-    final dhOutput1 = sodium.crypto. scalarMult(
+    final dhOutput1 = sodium.crypto.scalarMult(
       n: _myRatchetKeyPair!.secretKey,
       p: theirNewRatchetPublicKey,
     );

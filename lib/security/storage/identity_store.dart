@@ -1,5 +1,5 @@
 // Identity key storage
-import 'dart: typed_data';
+import 'dart:typed_data';
 
 import 'package:isar/isar.dart';
 

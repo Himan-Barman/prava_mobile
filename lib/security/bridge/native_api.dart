@@ -1,5 +1,5 @@
 // Native FFI bridge
-import 'dart: ffi';
+import 'dart:ffi';
 import 'dart:io';
 
 /// ============================================================

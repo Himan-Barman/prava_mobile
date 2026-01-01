@@ -1,7 +1,7 @@
 // PreKey entity
 import 'package:isar/isar.dart';
 
-part 'prekey_entity.g. dart';
+part 'prekey_entity.g.dart';
 
 /// ============================================================
 /// PreKey Entity - Database Model

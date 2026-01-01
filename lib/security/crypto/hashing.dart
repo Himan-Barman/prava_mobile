@@ -1,4 +1,3 @@
-// BLAKE2b, HKDF, KDF functions
 import 'dart:typed_data';
 
 import 'package:sodium_libs/sodium_libs.dart';
@@ -15,7 +14,7 @@ import '../bridge/sodium_loader.dart';
 /// • Argon2id: Password-based key derivation
 ///
 /// Security Level: 256-bit
-/// Standards:  RFC 7693 (BLAKE2), RFC 5869 (HKDF)
+/// Standards: RFC 7693 (BLAKE2), RFC 5869 (HKDF)
 /// ============================================================
 final class Hashing {
   Hashing._();
@@ -37,7 +36,7 @@ final class Hashing {
   }) async {
     _validateOutputLength(outputLength);
     final sodium = await SodiumLoader.sodium;
-    return sodium.crypto.genericHash(
+    return sodium.crypto. genericHash(
       message: data,
       outLen: outputLength,
     );
@@ -50,8 +49,8 @@ final class Hashing {
   }) {
     _validateOutputLength(outputLength);
     return SodiumLoader. sodiumSync.crypto.genericHash(
-      message: data,
-      outLen:  outputLength,
+      message:  data,
+      outLen: outputLength,
     );
   }
 
@@ -62,12 +61,20 @@ final class Hashing {
     int outputLength = defaultHashLength,
   }) async {
     _validateOutputLength(outputLength);
-    final sodium = await SodiumLoader. sodium;
-    return sodium.crypto.genericHash(
-      message:  data,
-      key: key,
-      outLen: outputLength,
-    );
+    final sodium = await SodiumLoader.sodium;
+
+    // Convert Uint8List key to SecureKey
+    final secureKey = sodium.secureCopy(key);
+
+    try {
+      return sodium.crypto.genericHash(
+        message:  data,
+        key: secureKey,
+        outLen:  outputLength,
+      );
+    } finally {
+      secureKey.dispose();
+    }
   }
 
   // ─────────────────────────────────────────────────────────
@@ -77,7 +84,7 @@ final class Hashing {
   /// Derive key using HKDF-style construction
   static Future<Uint8List> deriveKey({
     required Uint8List inputKeyMaterial,
-    Uint8List?  salt,
+    Uint8List? salt,
     Uint8List? info,
     int outputLength = defaultKeyLength,
   }) async {
@@ -87,11 +94,16 @@ final class Hashing {
     // Extract phase:  PRK = HMAC(salt, IKM)
     Uint8List prk;
     if (salt != null && salt.isNotEmpty) {
-      prk = sodium.crypto.genericHash(
-        message:  inputKeyMaterial,
-        key: salt,
-        outLen: 64,
-      );
+      final saltKey = sodium.secureCopy(salt);
+      try {
+        prk = sodium.crypto. genericHash(
+          message:  inputKeyMaterial,
+          key: saltKey,
+          outLen: 64,
+        );
+      } finally {
+        saltKey.dispose();
+      }
     } else {
       prk = sodium.crypto.genericHash(
         message:  inputKeyMaterial,
@@ -104,10 +116,10 @@ final class Hashing {
     if (info != null && info.isNotEmpty) {
       okm = sodium.crypto.genericHash(
         message:  Uint8List.fromList([... prk, ...info]),
-        outLen: outputLength,
+        outLen:  outputLength,
       );
     } else {
-      okm = sodium.crypto.genericHash(
+      okm = sodium.crypto. genericHash(
         message: prk,
         outLen: outputLength,
       );
@@ -129,13 +141,13 @@ final class Hashing {
 
     // Derive 64 bytes:  32 for root key, 32 for chain key
     final derived = sodium.crypto. genericHash(
-      message:  input,
+      message: input,
       outLen: 64,
     );
 
     return RootKeyDerivation(
       rootKey: derived. sublist(0, 32),
-      chainKey: derived.sublist(32, 64),
+      chainKey: derived. sublist(32, 64),
     );
   }
 
@@ -145,7 +157,7 @@ final class Hashing {
     final sodium = await SodiumLoader.sodium;
 
     // Message key = HMAC(chainKey, 0x01)
-    final messageKey = sodium.crypto. genericHash(
+    final messageKey = sodium.crypto.genericHash(
       message:  Uint8List.fromList([0x01, ...chainKey]),
       outLen: 32,
     );
@@ -181,34 +193,40 @@ final class Hashing {
     }
 
     final sodium = await SodiumLoader.sodium;
+    final params = _getArgon2Params(strength, sodium);
 
-    final (opsLimit, memLimit) = _getArgon2Params(strength, sodium);
+    // Convert password string to Int8List for pwhash. call
+    final passwordBytes = Int8List.fromList(password.codeUnits);
 
     return sodium.crypto.pwhash. call(
-      password:  password.codeUnits,
+      password: passwordBytes,
       salt: salt,
       outLen: outputLength,
-      opsLimit: opsLimit,
-      memLimit:  memLimit,
+      opsLimit: params.$1,
+      memLimit: params.$2,
     );
   }
 
   /// Generate password hash for storage
   static Future<String> hashPassword(String password) async {
     final sodium = await SodiumLoader.sodium;
-    return sodium. crypto.pwhash.str(
-      password:  password.codeUnits,
+    
+    // pwhash.str expects String directly
+    return sodium.crypto.pwhash.str(
+      password: password,
       opsLimit: sodium.crypto.pwhash.opsLimitModerate,
       memLimit: sodium.crypto.pwhash. memLimitModerate,
     );
   }
 
   /// Verify password against stored hash
-  static Future<bool> verifyPassword(String password, String hash) async {
+  static Future<bool> verifyPassword(String password, String storedHash) async {
     final sodium = await SodiumLoader.sodium;
-    return sodium.crypto. pwhash.strVerify(
-      passwordHash: hash,
-      password: password.codeUnits,
+    
+    // pwhash.strVerify expects String for password
+    return sodium. crypto.pwhash.strVerify(
+      passwordHash: storedHash,
+      password: password,
     );
   }
 
@@ -229,15 +247,15 @@ final class Hashing {
 
   /// Compute fingerprint for display (safety number)
   static Future<String> fingerprint(Uint8List publicKey) async {
-    final hash = await hash(publicKey, outputLength: 32);
-    return _formatFingerprint(hash);
+    final hashResult = await Hashing.hash(publicKey, outputLength: 32);
+    return _formatFingerprint(hashResult);
   }
 
-  static String _formatFingerprint(Uint8List hash) {
+  static String _formatFingerprint(Uint8List hashData) {
     final buffer = StringBuffer();
     for (var i = 0; i < 30; i += 5) {
       if (i > 0) buffer.write(' ');
-      final segment = hash.sublist(i, i + 5);
+      final segment = hashData.sublist(i, i + 5);
       final num = segment.fold<int>(0, (acc, b) => (acc << 8) | b);
       buffer.write((num % 100000).toString().padLeft(5, '0'));
     }
@@ -250,21 +268,24 @@ final class Hashing {
     }
   }
 
-  static (int, int) _getArgon2Params(PasswordHashStrength strength, Sodium sodium) {
+  static (int, int) _getArgon2Params(
+    PasswordHashStrength strength,
+    Sodium sodium,
+  ) {
     switch (strength) {
       case PasswordHashStrength.interactive:
         return (
-          sodium.crypto. pwhash. opsLimitInteractive,
-          sodium. crypto.pwhash.memLimitInteractive,
+          sodium.crypto. pwhash.opsLimitInteractive,
+          sodium.crypto.pwhash. memLimitInteractive,
         );
       case PasswordHashStrength.moderate:
         return (
-          sodium.crypto.pwhash. opsLimitModerate,
-          sodium.crypto.pwhash.memLimitModerate,
+          sodium.crypto. pwhash. opsLimitModerate,
+          sodium. crypto.pwhash.memLimitModerate,
         );
-      case PasswordHashStrength. sensitive:
+      case PasswordHashStrength.sensitive:
         return (
-          sodium. crypto.pwhash.opsLimitSensitive,
+          sodium.crypto.pwhash. opsLimitSensitive,
           sodium.crypto.pwhash.memLimitSensitive,
         );
     }

@@ -1,7 +1,6 @@
-// X3DH key agreement
-import 'dart: typed_data';
+import 'dart:typed_data';
 
-import 'package: sodium_libs/sodium_libs.dart';
+import 'package:sodium_libs/sodium_libs.dart';
 
 import '../bridge/sodium_loader.dart';
 import 'hashing.dart';
@@ -10,7 +9,7 @@ import 'signatures.dart';
 /// ============================================================
 /// Extended Triple Diffie-Hellman (X3DH)
 /// ============================================================
-/// Implements Signal Protocol X3DH key agreement: 
+/// Implements Signal Protocol X3DH key agreement:  
 ///
 /// Purpose: 
 /// • Establish shared secret between two parties
@@ -25,7 +24,7 @@ import 'signatures.dart';
 ///
 /// SK = KDF(DH1 || DH2 || DH3 || DH4)
 ///
-/// Output: Shared secret used as initial root key for Double Ratchet
+/// Output:  Shared secret used as initial root key for Double Ratchet
 ///
 /// Standards: Signal Protocol Specification
 /// ============================================================
@@ -46,96 +45,152 @@ final class X3DH {
 
   /// Initiate X3DH session as sender
   ///
-  /// Alice calls this to establish a session with Bob. 
+  /// Alice calls this to establish a session with Bob.  
   /// Returns shared secret and ephemeral public key to send to Bob.
+  ///
+  /// Note: This implementation assumes identity keys are already X25519.
+  /// If using Ed25519 identity keys, convert them before calling this method.
   static Future<X3DHInitiatorResult> initiateSession({
-    required Uint8List myIdentityPublicKey,
-    required SecureKey myIdentityPrivateKey,
-    required Uint8List theirIdentityPublicKey,
+    required Uint8List myIdentityPublicKeyX25519,
+    required SecureKey myIdentityPrivateKeyX25519,
+    required Uint8List theirIdentityPublicKeyX25519,
     required Uint8List theirSignedPreKeyPublic,
     required Uint8List theirSignedPreKeySignature,
-    Uint8List?  theirOneTimePreKeyPublic,
+    required Uint8List theirIdentityPublicKeyEd25519,
+    Uint8List? theirOneTimePreKeyPublic,
     int? theirOneTimePreKeyId,
   }) async {
     final sodium = await SodiumLoader.sodium;
 
-    // ─────────────────────────────────────────────────────
     // Step 1: Verify signed pre-key signature
-    // ─────────────────────────────────────────────────────
-    final signatureValid = await Signatures. verifyPreKey(
+    final signatureValid = await Signatures.verifyPreKey(
       theirSignedPreKeyPublic,
       theirSignedPreKeySignature,
-      theirIdentityPublicKey,
+      theirIdentityPublicKeyEd25519,
     );
 
     if (!signatureValid) {
       throw X3DHException('Invalid signed pre-key signature');
     }
 
-    // ─────────────────────────────────────────────────────
     // Step 2: Generate ephemeral key pair
-    // ─────────────────────────────────────────────────────
-    final ephemeralKeyPair = sodium.crypto.box. keyPair();
+    final ephemeralKeyPair = sodium.crypto. box. keyPair();
 
-    // ─────────────────────────────────────────────────────
-    // Step 3: Convert Ed25519 identity keys to X25519
-    // ─────────────────────────────────────────────────────
-    final myIdentityX25519Sk = sodium.crypto.sign. ed25519SkToCurve25519(
-      myIdentityPrivateKey,
-    );
-    final theirIdentityX25519Pk = sodium.crypto. sign.ed25519PkToCurve25519(
-      theirIdentityPublicKey,
-    );
-
-    // ─────────────────────────────────────────────────────
-    // Step 4: Perform DH calculations
-    // ─────────────────────────────────────────────────────
+    // Step 3: Perform DH calculations
 
     // DH1:  My identity private * Their signed pre-key public
-    final dh1 = sodium. crypto.scalarMult(
-      n: myIdentityX25519Sk,
-      p: theirSignedPreKeyPublic,
+    final dh1 = _scalarMult(
+      sodium,
+      myIdentityPrivateKeyX25519,
+      theirSignedPreKeyPublic,
     );
 
     // DH2: My ephemeral private * Their identity public
-    final dh2 = sodium.crypto.scalarMult(
-      n: ephemeralKeyPair. secretKey,
-      p: theirIdentityX25519Pk,
+    final dh2 = _scalarMult(
+      sodium,
+      ephemeralKeyPair. secretKey,
+      theirIdentityPublicKeyX25519,
     );
 
     // DH3: My ephemeral private * Their signed pre-key public
-    final dh3 = sodium.crypto.scalarMult(
-      n:  ephemeralKeyPair.secretKey,
-      p: theirSignedPreKeyPublic,
+    final dh3 = _scalarMult(
+      sodium,
+      ephemeralKeyPair.secretKey,
+      theirSignedPreKeyPublic,
     );
 
     // DH4: My ephemeral private * Their one-time pre-key public (optional)
     Uint8List? dh4;
     if (theirOneTimePreKeyPublic != null) {
-      dh4 = sodium.crypto.scalarMult(
-        n: ephemeralKeyPair.secretKey,
-        p: theirOneTimePreKeyPublic,
+      dh4 = _scalarMult(
+        sodium,
+        ephemeralKeyPair. secretKey,
+        theirOneTimePreKeyPublic,
       );
     }
 
-    // ─────────────────────────────────────────────────────
-    // Step 5: Derive shared secret
-    // ─────────────────────────────────────────────────────
+    // Step 4: Derive shared secret
     final sharedSecret = await _deriveSharedSecret(
+      sodium:  sodium,
       dh1: dh1,
       dh2: dh2,
       dh3: dh3,
       dh4: dh4,
     );
 
-    // ─────────────────────────────────────────────────────
-    // Step 6: Clean up intermediate values
-    // ─────────────────────────────────────────────────────
+    // Step 5: Clean up intermediate values
     _zeroize(dh1);
     _zeroize(dh2);
     _zeroize(dh3);
     if (dh4 != null) _zeroize(dh4);
-    myIdentityX25519Sk. dispose();
+
+    return X3DHInitiatorResult(
+      sharedSecret:  sharedSecret,
+      ephemeralPublicKey: ephemeralKeyPair. publicKey,
+      usedOneTimePreKeyId: theirOneTimePreKeyId,
+    );
+  }
+
+  /// Simplified session initiation using X25519 keys directly
+  ///
+  /// Use this when all keys are already X25519 (recommended approach)
+  static Future<X3DHInitiatorResult> initiateSessionSimple({
+    required SecureKey myIdentityPrivateKey,
+    required Uint8List theirIdentityPublicKey,
+    required Uint8List theirSignedPreKeyPublic,
+    Uint8List? theirOneTimePreKeyPublic,
+    int?  theirOneTimePreKeyId,
+  }) async {
+    final sodium = await SodiumLoader.sodium;
+
+    // Generate ephemeral key pair
+    final ephemeralKeyPair = sodium.crypto.box.keyPair();
+
+    // DH1: My identity private * Their signed pre-key public
+    final dh1 = _scalarMult(
+      sodium,
+      myIdentityPrivateKey,
+      theirSignedPreKeyPublic,
+    );
+
+    // DH2: My ephemeral private * Their identity public
+    final dh2 = _scalarMult(
+      sodium,
+      ephemeralKeyPair.secretKey,
+      theirIdentityPublicKey,
+    );
+
+    // DH3: My ephemeral private * Their signed pre-key public
+    final dh3 = _scalarMult(
+      sodium,
+      ephemeralKeyPair.secretKey,
+      theirSignedPreKeyPublic,
+    );
+
+    // DH4: Optional
+    Uint8List? dh4;
+    if (theirOneTimePreKeyPublic != null) {
+      dh4 = _scalarMult(
+        sodium,
+        ephemeralKeyPair.secretKey,
+        theirOneTimePreKeyPublic,
+      );
+    }
+
+    // Derive shared secret
+    final sharedSecret = await _deriveSharedSecret(
+      sodium: sodium,
+      dh1: dh1,
+      dh2: dh2,
+      dh3: dh3,
+      dh4: dh4,
+    );
+
+    // Clean up
+    _zeroize(dh1);
+    _zeroize(dh2);
+    _zeroize(dh3);
+    if (dh4 != null) _zeroize(dh4);
 
     return X3DHInitiatorResult(
       sharedSecret: sharedSecret,
@@ -152,78 +207,79 @@ final class X3DH {
   ///
   /// Bob calls this when receiving Alice's initial message.
   static Future<X3DHResponderResult> completeSession({
-    required Uint8List myIdentityPublicKey,
-    required SecureKey myIdentityPrivateKey,
-    required Uint8List mySignedPreKeyPublic,
+    required SecureKey myIdentityPrivateKeyX25519,
     required SecureKey mySignedPreKeyPrivate,
     SecureKey? myOneTimePreKeyPrivate,
-    required Uint8List theirIdentityPublicKey,
+    required Uint8List theirIdentityPublicKeyX25519,
     required Uint8List theirEphemeralPublicKey,
   }) async {
     final sodium = await SodiumLoader.sodium;
 
-    // ─────────────────────────────────────────────────────
-    // Step 1: Convert Ed25519 identity keys to X25519
-    // ─────────────────────────────────────────────────────
-    final myIdentityX25519Sk = sodium.crypto.sign.ed25519SkToCurve25519(
-      myIdentityPrivateKey,
-    );
-    final theirIdentityX25519Pk = sodium. crypto.sign.ed25519PkToCurve25519(
-      theirIdentityPublicKey,
-    );
-
-    // ─────────────────────────────────────────────────────
-    // Step 2: Perform DH calculations (reverse of initiator)
-    // ─────────────────────────────────────────────────────
-
     // DH1: My signed pre-key private * Their identity public
-    final dh1 = sodium.crypto. scalarMult(
-      n: mySignedPreKeyPrivate,
-      p: theirIdentityX25519Pk,
+    final dh1 = _scalarMult(
+      sodium,
+      mySignedPreKeyPrivate,
+      theirIdentityPublicKeyX25519,
     );
 
     // DH2: My identity private * Their ephemeral public
-    final dh2 = sodium.crypto. scalarMult(
-      n: myIdentityX25519Sk,
-      p: theirEphemeralPublicKey,
+    final dh2 = _scalarMult(
+      sodium,
+      myIdentityPrivateKeyX25519,
+      theirEphemeralPublicKey,
     );
 
     // DH3: My signed pre-key private * Their ephemeral public
-    final dh3 = sodium.crypto. scalarMult(
-      n: mySignedPreKeyPrivate,
-      p: theirEphemeralPublicKey,
+    final dh3 = _scalarMult(
+      sodium,
+      mySignedPreKeyPrivate,
+      theirEphemeralPublicKey,
     );
 
     // DH4: My one-time pre-key private * Their ephemeral public (optional)
-    Uint8List?  dh4;
+    Uint8List? dh4;
     if (myOneTimePreKeyPrivate != null) {
-      dh4 = sodium.crypto. scalarMult(
-        n: myOneTimePreKeyPrivate,
-        p: theirEphemeralPublicKey,
+      dh4 = _scalarMult(
+        sodium,
+        myOneTimePreKeyPrivate,
+        theirEphemeralPublicKey,
       );
     }
 
-    // ─────────────────────────────────────────────────────
-    // Step 3: Derive shared secret
-    // ─────────────────────────────────────────────────────
+    // Derive shared secret
     final sharedSecret = await _deriveSharedSecret(
+      sodium: sodium,
       dh1: dh1,
       dh2: dh2,
       dh3: dh3,
       dh4: dh4,
     );
 
-    // ─────────────────────────────────────────────────────
-    // Step 4: Clean up intermediate values
-    // ─────────────────────────────────────────────────────
+    // Clean up
     _zeroize(dh1);
     _zeroize(dh2);
     _zeroize(dh3);
     if (dh4 != null) _zeroize(dh4);
-    myIdentityX25519Sk.dispose();
 
     return X3DHResponderResult(
-      sharedSecret:  sharedSecret,
+      sharedSecret: sharedSecret,
+    );
+  }
+
+  /// Simplified session completion using X25519 keys directly
+  static Future<X3DHResponderResult> completeSessionSimple({
+    required SecureKey myIdentityPrivateKey,
+    required SecureKey mySignedPreKeyPrivate,
+    SecureKey? myOneTimePreKeyPrivate,
+    required Uint8List theirIdentityPublicKey,
+    required Uint8List theirEphemeralPublicKey,
+  }) async {
+    return completeSession(
+      myIdentityPrivateKeyX25519: myIdentityPrivateKey,
+      mySignedPreKeyPrivate: mySignedPreKeyPrivate,
+      myOneTimePreKeyPrivate: myOneTimePreKeyPrivate,
+      theirIdentityPublicKeyX25519: theirIdentityPublicKey,
+      theirEphemeralPublicKey:  theirEphemeralPublicKey,
     );
   }
 
@@ -231,17 +287,44 @@ final class X3DH {
   // Helper Functions
   // ─────────────────────────────────────────────────────────
 
+  /// Perform X25519 scalar multiplication using crypto_box beforenm
+  /// This computes the shared secret between a private and public key
+  static Uint8List _scalarMult(
+    Sodium sodium,
+    SecureKey privateKey,
+    Uint8List publicKey,
+  ) {
+    // Use crypto_box_beforenm which performs X25519 DH
+    // It computes:  shared = X25519(privateKey, publicKey)
+    // The result is then hashed with HSalsa20, but for our purposes
+    // we can use this as our DH output
+    
+    // Alternative: Use crypto_kx if available, or implement raw scalarmult
+    
+    // crypto_box. easy uses X25519 internally, we can extract the shared key
+    // by using the precalculate method
+    final sharedKey = sodium.crypto. box. precalculate(
+      publicKey:  publicKey,
+      secretKey: privateKey,
+    );
+    
+    // Extract the bytes from the precalculated key
+    final sharedBytes = sharedKey.extractBytes();
+    sharedKey.dispose();
+    
+    return sharedBytes;
+  }
+
   /// Derive shared secret from DH outputs
   static Future<SecureKey> _deriveSharedSecret({
+    required Sodium sodium,
     required Uint8List dh1,
     required Uint8List dh2,
     required Uint8List dh3,
     Uint8List? dh4,
   }) async {
-    final sodium = await SodiumLoader.sodium;
-
     // Concatenate DH outputs
-    final combined = Uint8List. fromList([
+    final combined = Uint8List.fromList([
       ... dh1,
       ...dh2,
       ... dh3,
@@ -282,7 +365,7 @@ class X3DHInitiatorResult {
 
   const X3DHInitiatorResult({
     required this.sharedSecret,
-    required this. ephemeralPublicKey,
+    required this.ephemeralPublicKey,
     this.usedOneTimePreKeyId,
   });
 

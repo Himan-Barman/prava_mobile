@@ -1,7 +1,7 @@
 // Chain key derivation
 import 'dart:typed_data';
 
-import 'package:sodium_libs/sodium_libs. dart';
+import 'package:sodium_libs/sodium_libs.dart';
 
 import '../bridge/sodium_loader.dart';
 import '../crypto/hashing.dart';
@@ -63,7 +63,7 @@ final class ChainKey {
 
     // Message key = HMAC(CK, 0x01)
     final messageKey = sodium.crypto.genericHash(
-      message:  Uint8List.fromList([0x01, .. ._key]),
+      message:  Uint8List.fromList([0x01, ..._key]),
       outLen: 32,
     );
 

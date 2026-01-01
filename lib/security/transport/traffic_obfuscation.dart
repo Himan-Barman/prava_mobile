@@ -1,6 +1,6 @@
 // Traffic obfuscation
 import 'dart:math';
-import 'dart: typed_data';
+import 'dart:typed_data';
 
 import '../crypto/random_generator.dart';
 

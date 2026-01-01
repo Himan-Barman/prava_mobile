@@ -1,7 +1,7 @@
 // Sender key entity
 import 'package:isar/isar.dart';
 
-part 'sender_key_entity. g.dart';
+part 'sender_key_entity.g.dart';
 
 /// ============================================================
 /// Sender Key Entity - Database Model

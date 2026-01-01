@@ -94,7 +94,7 @@ final class MessageKeys {
 
     try {
       // Encrypt with XChaCha20-Poly1305
-      final ciphertext = sodium.crypto. aead.xchacha20Poly1305Ietf.encrypt(
+      final ciphertext = sodium.crypto.aead.xchacha20Poly1305Ietf.encrypt(
         message: plaintext,
         nonce:  nonce,
         key: key,
