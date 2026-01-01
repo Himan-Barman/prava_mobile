@@ -1,5 +1,6 @@
 // Encrypted vault
 import 'dart:async';
+import 'dart:io';
 
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
@@ -13,47 +14,30 @@ import '../entities/signed_prekey_entity.dart';
 /// ============================================================
 /// Vault - Secure Encrypted Database
 /// ============================================================
-/// Central access point for all cryptographic state: 
-///
-/// Features:
-/// • Encrypted at rest (AES-256)
-/// • Atomic transactions
-/// • Lazy initialization
-/// • Automatic schema migrations
-/// • Backup/restore support
-///
-/// Stores:
-/// • Identity keys
-/// • Session states (Double Ratchet)
-/// • Pre-keys (one-time and signed)
-/// • Sender keys (group messaging)
-/// ============================================================
 final class Vault {
   Vault._();
 
   static Isar?  _db;
   static bool _initialized = false;
   static Completer<void>? _initCompleter;
+  static String?  _dbPath;
 
-  /// Check if vault is initialized
   static bool get isInitialized => _initialized;
 
-  /// Get database instance
   static Isar get db {
     if (! _initialized || _db == null) {
       throw StateError('Vault not initialized.  Call Vault.initialize() first.');
     }
-    return _db! ;
+    return _db!;
   }
 
   /// Initialize vault with optional encryption
   static Future<void> initialize({
     String? encryptionKey,
-    String?  directory,
+    String? directory,
   }) async {
     if (_initialized) return;
 
-    // Prevent concurrent initialization
     if (_initCompleter != null) {
       await _initCompleter! .future;
       return;
@@ -63,6 +47,7 @@ final class Vault {
 
     try {
       final dir = directory ?? (await getApplicationDocumentsDirectory()).path;
+      _dbPath = dir;
 
       _db = await Isar.open(
         [
@@ -74,7 +59,7 @@ final class Vault {
         ],
         directory: dir,
         name: 'prava_vault',
-        inspector: false, // Disable in production
+        inspector: false,
       );
 
       _initialized = true;
@@ -90,7 +75,7 @@ final class Vault {
   static Future<void> close() async {
     if (! _initialized || _db == null) return;
 
-    await _db!.close();
+    await _db! .close();
     _db = null;
     _initialized = false;
     _initCompleter = null;
@@ -101,7 +86,7 @@ final class Vault {
     _ensureInitialized();
 
     await _db! .writeTxn(() async {
-      await _db!.clear();
+      await _db! .clear();
     });
   }
 
@@ -118,15 +103,34 @@ final class Vault {
   }
 
   /// Export database for backup
+  /// Returns the raw bytes of the database file
   static Future<List<int>> export() async {
     _ensureInitialized();
-    return _db!.copyToBytes();
+    
+    // Get the database file path
+    final dbFile = File('$_dbPath/prava_vault.isar');
+    
+    if (await dbFile.exists()) {
+      return dbFile.readAsBytes();
+    }
+    
+    // If file doesn't exist, return empty list
+    return [];
   }
 
   /// Get database size in bytes
   static Future<int> getSize() async {
     _ensureInitialized();
-    return _db!. getSize();
+    
+    // Get the database file size
+    final dbFile = File('$_dbPath/prava_vault.isar');
+    
+    if (await dbFile.exists()) {
+      final stat = await dbFile. stat();
+      return stat.size;
+    }
+    
+    return 0;
   }
 
   /// Get collection counts
@@ -136,10 +140,10 @@ final class Vault {
     return VaultStats(
       identityCount: await _db!.identityEntitys.count(),
       sessionCount: await _db!.sessionEntitys.count(),
-      preKeyCount: await _db!.preKeyEntitys.count(),
-      signedPreKeyCount: await _db!.signedPreKeyEntitys. count(),
-      senderKeyCount: await _db!.senderKeyEntitys. count(),
-      sizeBytes: await _db!.getSize(),
+      preKeyCount:  await _db!. preKeyEntitys. count(),
+      signedPreKeyCount:  await _db!. signedPreKeyEntitys.count(),
+      senderKeyCount: await _db! .senderKeyEntitys.count(),
+      sizeBytes: await getSize(),
     );
   }
 
@@ -160,10 +164,10 @@ class VaultStats {
   final int sizeBytes;
 
   const VaultStats({
-    required this. identityCount,
+    required this.identityCount,
     required this.sessionCount,
     required this.preKeyCount,
-    required this.signedPreKeyCount,
+    required this. signedPreKeyCount,
     required this.senderKeyCount,
     required this.sizeBytes,
   });
@@ -177,7 +181,9 @@ class VaultStats {
 
   String get sizeFormatted {
     if (sizeBytes < 1024) return '$sizeBytes B';
-    if (sizeBytes < 1024 * 1024) return '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
+    if (sizeBytes < 1024 * 1024) {
+      return '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
+    }
     return '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 

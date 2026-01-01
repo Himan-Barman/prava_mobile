@@ -1,217 +1,174 @@
-// Skipped message keys
+import 'dart:convert';
 import 'dart:typed_data';
 
-/// ============================================================
-/// Skipped Message Keys Storage
-/// ============================================================
-/// Handles out-of-order message delivery:
-///
-/// Problem:
-/// • Messages may arrive out of order
-/// • Each message key is used exactly once
-/// • Must store skipped keys for later use
-///
-/// Solution:
-/// • Store (ratchet_public_key, message_index) -> message_key
-/// • Limit maximum stored keys (prevent DoS)
-/// • Expire old keys after timeout
-///
-/// Security Considerations:
-/// • Maximum skip limit prevents memory exhaustion
-/// • Keys are deleted after use
-/// • Optional expiration for old keys
-/// ============================================================
-final class SkippedMessageKeys {
-  final Map<String, SkippedKey> _keys = {};
+/// Manages skipped message keys for out-of-order message delivery
+class SkippedMessageKeys {
+  /// Maximum number of keys to skip per chain
+  static const int maxSkipPerChain = 1000;
 
-  /// Maximum number of skipped keys per session
-  static const int maxSkippedKeys = 1000;
+  /// Maximum total skipped keys to store
+  static const int maxTotalKeys = 5000;
 
-  /// Maximum keys to skip in a single chain
-  static const int maxSkipPerChain = 500;
+  /// Key expiration time in milliseconds (7 days)
+  static const int expirationMs = 7 * 24 * 60 * 60 * 1000;
 
-  /// Key expiration time (24 hours)
-  static const Duration keyExpiration = Duration(hours: 24);
+  /// Stored skipped keys:  Map<ratchetPublicKeyHex, Map<messageNumber, StoredKey>>
+  final Map<String, Map<int, _StoredKey>> _keys;
+
+  /// Private constructor
+  SkippedMessageKeys. _(this._keys);
+
+  /// Create empty instance
+  factory SkippedMessageKeys.empty() {
+    return SkippedMessageKeys._({});
+  }
+
+  /// Create from JSON
+  factory SkippedMessageKeys.fromJson(Map<String, dynamic> json) {
+    final keys = <String, Map<int, _StoredKey>>{};
+
+    for (final entry in json.entries) {
+      final chainKeys = <int, _StoredKey>{};
+      final chainData = entry.value as Map<String, dynamic>;
+
+      for (final keyEntry in chainData.entries) {
+        final messageNum = int.parse(keyEntry.key);
+        final stored = keyEntry.value as Map<String, dynamic>;
+        chainKeys[messageNum] = _StoredKey(
+          key:  Uint8List.fromList((stored['key'] as List).cast<int>()),
+          timestamp: stored['timestamp'] as int,
+        );
+      }
+
+      keys[entry. key] = chainKeys;
+    }
+
+    return SkippedMessageKeys. _(keys);
+  }
 
   /// Number of stored keys
-  int get count => _keys.length;
-
-  /// Check if we have a key for this message
-  bool hasKey(Uint8List ratchetPublicKey, int messageIndex) {
-    final keyId = _makeKeyId(ratchetPublicKey, messageIndex);
-    return _keys.containsKey(keyId);
-  }
-
-  /// Get and remove a skipped key
-  Uint8List?  consumeKey(Uint8List ratchetPublicKey, int messageIndex) {
-    final keyId = _makeKeyId(ratchetPublicKey, messageIndex);
-    final skipped = _keys.remove(keyId);
-
-    if (skipped == null) return null;
-
-    // Check expiration
-    if (skipped.isExpired) {
-      _zeroize(skipped. messageKey);
-      return null;
+  int get count {
+    var total = 0;
+    for (final chain in _keys.values) {
+      total += chain.length;
     }
-
-    return skipped.messageKey;
+    return total;
   }
 
-  /// Store a skipped key
+  /// Store a skipped message key
   void storeKey(
     Uint8List ratchetPublicKey,
-    int messageIndex,
+    int messageNumber,
     Uint8List messageKey,
   ) {
-    // Enforce maximum keys
-    if (_keys.length >= maxSkippedKeys) {
-      _evictOldest();
+    if (count >= maxTotalKeys) {
+      _removeOldest();
     }
 
-    final keyId = _makeKeyId(ratchetPublicKey, messageIndex);
-    _keys[keyId] = SkippedKey(
-      messageKey:  Uint8List.fromList(messageKey),
-      storedAt: DateTime. now(),
+    final keyHex = _bytesToHex(ratchetPublicKey);
+    _keys. putIfAbsent(keyHex, () => {});
+    _keys[keyHex]![messageNumber] = _StoredKey(
+      key: Uint8List.fromList(messageKey),
+      timestamp: DateTime.now().millisecondsSinceEpoch,
     );
   }
 
-  /// Store multiple skipped keys
-  void storeKeys(
-    Uint8List ratchetPublicKey,
-    Map<int, Uint8List> keys,
-  ) {
-    for (final entry in keys.entries) {
-      storeKey(ratchetPublicKey, entry.key, entry.value);
+  /// Consume (get and remove) a skipped message key
+  Uint8List?  consumeKey(Uint8List ratchetPublicKey, int messageNumber) {
+    final keyHex = _bytesToHex(ratchetPublicKey);
+    final chain = _keys[keyHex];
+    if (chain == null) return null;
+
+    final stored = chain. remove(messageNumber);
+    if (stored == null) return null;
+
+    if (chain.isEmpty) {
+      _keys.remove(keyHex);
     }
+
+    return stored.key;
   }
 
   /// Remove expired keys
   void removeExpired() {
-    final expired = <String>[];
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final cutoff = now - expirationMs;
 
-    for (final entry in _keys.entries) {
-      if (entry.value. isExpired) {
-        expired.add(entry.key);
-        _zeroize(entry.value.messageKey);
-      }
+    for (final chain in _keys.values) {
+      chain.removeWhere((_, stored) => stored.timestamp < cutoff);
     }
 
-    for (final keyId in expired) {
-      _keys.remove(keyId);
-    }
-  }
-
-  /// Remove all keys for a ratchet public key
-  void removeForRatchetKey(Uint8List ratchetPublicKey) {
-    final prefix = _keyPrefix(ratchetPublicKey);
-    final toRemove = <String>[];
-
-    for (final entry in _keys.entries) {
-      if (entry.key.startsWith(prefix)) {
-        toRemove. add(entry.key);
-        _zeroize(entry.value.messageKey);
-      }
-    }
-
-    for (final keyId in toRemove) {
-      _keys.remove(keyId);
-    }
+    _keys.removeWhere((_, chain) => chain.isEmpty);
   }
 
   /// Clear all keys
   void clear() {
-    for (final key in _keys.values) {
-      _zeroize(key.messageKey);
+    for (final chain in _keys.values) {
+      for (final stored in chain.values) {
+        _zeroize(stored. key);
+      }
     }
     _keys.clear();
   }
 
-  /// Serialize for storage
+  /// Serialize to JSON
   Map<String, dynamic> toJson() {
-    final keysJson = <String, dynamic>{};
+    final result = <String, dynamic>{};
 
     for (final entry in _keys.entries) {
-      keysJson[entry.key] = {
-        'messageKey': entry.value. messageKey.toList(),
-        'storedAt': entry. value.storedAt.millisecondsSinceEpoch,
-      };
+      final chainData = <String, dynamic>{};
+      for (final keyEntry in entry. value.entries) {
+        chainData[keyEntry.key. toString()] = {
+          'key':  keyEntry.value. key.toList(),
+          'timestamp':  keyEntry.value. timestamp,
+        };
+      }
+      result[entry.key] = chainData;
     }
 
-    return {'keys': keysJson};
+    return result;
   }
 
-  /// Deserialize from storage
-  factory SkippedMessageKeys.fromJson(Map<String, dynamic> json) {
-    final instance = SkippedMessageKeys();
-
-    final keysJson = json['keys'] as Map<String, dynamic>? ??  {};
-    for (final entry in keysJson.entries) {
-      final data = entry.value as Map<String, dynamic>;
-      instance._keys[entry. key] = SkippedKey(
-        messageKey:  Uint8List. fromList((data['messageKey'] as List).cast<int>()),
-        storedAt: DateTime.fromMillisecondsSinceEpoch(data['storedAt'] as int),
-      );
-    }
-
-    return instance;
-  }
-
-  /// Create unique key ID
-  String _makeKeyId(Uint8List ratchetPublicKey, int messageIndex) {
-    return '${_keyPrefix(ratchetPublicKey)}: $messageIndex';
-  }
-
-  /// Get key prefix from ratchet public key
-  String _keyPrefix(Uint8List ratchetPublicKey) {
-    return ratchetPublicKey
-        .map((b) => b.toRadixString(16).padLeft(2, '0'))
-        .join();
-  }
-
-  /// Evict oldest key
-  void _evictOldest() {
-    if (_keys.isEmpty) return;
-
-    String?  oldestKey;
-    DateTime?  oldestTime;
+  void _removeOldest() {
+    int?  oldestTime;
+    String? oldestChain;
+    int? oldestNumber;
 
     for (final entry in _keys.entries) {
-      if (oldestTime == null || entry.value.storedAt. isBefore(oldestTime)) {
-        oldestKey = entry.key;
-        oldestTime = entry.value.storedAt;
+      for (final keyEntry in entry.value.entries) {
+        if (oldestTime == null || keyEntry.value. timestamp < oldestTime) {
+          oldestTime = keyEntry. value.timestamp;
+          oldestChain = entry.key;
+          oldestNumber = keyEntry.key;
+        }
       }
     }
 
-    if (oldestKey != null) {
-      final removed = _keys.remove(oldestKey);
-      if (removed != null) {
-        _zeroize(removed. messageKey);
+    if (oldestChain != null && oldestNumber != null) {
+      final stored = _keys[oldestChain]?. remove(oldestNumber);
+      if (stored != null) {
+        _zeroize(stored.key);
+      }
+      if (_keys[oldestChain]?.isEmpty ??  false) {
+        _keys.remove(oldestChain);
       }
     }
   }
 
-  /// Zero a buffer
-  void _zeroize(Uint8List buffer) {
+  static String _bytesToHex(Uint8List bytes) {
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  }
+
+  static void _zeroize(Uint8List buffer) {
     for (var i = 0; i < buffer.length; i++) {
       buffer[i] = 0;
     }
   }
 }
 
-/// Stored skipped key
-class SkippedKey {
-  final Uint8List messageKey;
-  final DateTime storedAt;
+class _StoredKey {
+  final Uint8List key;
+  final int timestamp;
 
-  const SkippedKey({
-    required this.messageKey,
-    required this.storedAt,
-  });
-
-  /// Check if key is expired
-  bool get isExpired {
-    final age = DateTime.now().difference(storedAt);
-    return age > SkippedMessageKeys.keyExpiration;
-  }
+  _StoredKey({required this.key, required this.timestamp});
 }

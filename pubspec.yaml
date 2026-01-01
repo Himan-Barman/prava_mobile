@@ -1,15 +1,15 @@
 name: mobile
 description: "Prava Mobile Application - Secure Messaging Platform"
-publish_to: 'none'
+publish_to: "none"
 
 version: 1.0.0+1
 
-environment: 
+environment:
   sdk: ^3.10.4
 
 dependencies:
   flutter:
-    sdk:  flutter
+    sdk: flutter
 
   # =========================
   # UI / PLATFORM
@@ -27,7 +27,7 @@ dependencies:
   # =========================
   # FFI / NATIVE BRIDGE
   # =========================
-  ffi:  ^2.1.2                      # Native memory management
+  ffi: ^2.1.2                      # Native memory management
 
   # =========================
   # SECURE STORAGE
@@ -37,7 +37,7 @@ dependencies:
   # =========================
   # TRANSACTIONAL DATABASE (Ratchet state)
   # =========================
-  isar:  ^3.1.0+1
+  isar: ^3.1.0+1
   isar_flutter_libs: ^3.1.0+1
   path_provider: ^2.1.4
 
@@ -49,7 +49,7 @@ dependencies:
   # =========================
   # AUTH & PASSWORD SECURITY
   # =========================
-  zxcvbn:  ^1.0.0                   # Password strength estimation
+  zxcvbn: ^1.0.0                   # Password strength estimation
   local_auth: ^2.3.0               # Biometric authentication
 
   # =========================
@@ -58,9 +58,9 @@ dependencies:
   device_info_plus: ^10.1.2
   package_info_plus: ^8.0.2
 
-dev_dependencies: 
+dev_dependencies:
   flutter_test:
-    sdk:  flutter
+    sdk: flutter
 
   flutter_lints: ^4.0.0
 
@@ -82,7 +82,7 @@ flutter:
         - asset: assets/fonts/Inter-Regular.ttf
         - asset: assets/fonts/Inter-Medium.ttf
           weight: 500
-        - asset: assets/fonts/Inter-SemiBold. ttf
+        - asset: assets/fonts/Inter-SemiBold.ttf
           weight: 600
         - asset: assets/fonts/Inter-Bold.ttf
           weight: 700

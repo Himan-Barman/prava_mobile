@@ -1,4 +1,3 @@
-// Backup crypto (Argon2id)
 import 'dart:typed_data';
 
 import 'package:sodium_libs/sodium_libs.dart';
@@ -14,24 +13,19 @@ import '../crypto/random_generator.dart';
 /// • Argon2id for password-based key derivation
 /// • XChaCha20-Poly1305 for encryption
 /// • Strong parameters for offline attack resistance
-///
-/// Parameters:
-/// • Argon2id: 3 iterations, 64MB memory
-/// • Salt: 16 bytes random
-/// • Nonce: 24 bytes random
 /// ============================================================
 final class BackupCrypto {
   BackupCrypto._();
 
-  /// Salt size in bytes
   static const int saltSize = 16;
-
-  /// Minimum passphrase length
   static const int minPassphraseLength = 8;
+  
+  // XChaCha20-Poly1305 constants
+  static const int nonceSize = 24;
+  static const int tagSize = 16;
 
-  /// Generate fresh salt
   static Future<Uint8List> generateSalt() async {
-    return RandomGenerator.salt(length: saltSize);
+    return RandomGenerator. salt(length: saltSize);
   }
 
   /// Derive backup key from passphrase
@@ -51,27 +45,27 @@ final class BackupCrypto {
     final sodium = await SodiumLoader.sodium;
 
     return sodium.crypto. pwhash. call(
-      password: passphrase. codeUnits,
+      password: Int8List.fromList(passphrase.codeUnits),
       salt: salt,
       outLen: 32,
       opsLimit: sodium.crypto.pwhash.opsLimitModerate,
-      memLimit: sodium.crypto.pwhash. memLimitModerate,
+      memLimit: sodium.crypto. pwhash.memLimitModerate,
     );
   }
 
-  /// Encrypt backup data
+  /// Encrypt backup data with XChaCha20-Poly1305
   static Future<Uint8List> encrypt({
     required SecureKey key,
     required Uint8List plaintext,
   }) async {
     final sodium = await SodiumLoader.sodium;
 
-    // Generate random nonce
-    final nonceLen = sodium.crypto. aead.xchacha20Poly1305Ietf.nonceBytes;
-    final nonce = sodium.randombytes. buf(nonceLen);
+    // Generate random nonce (24 bytes for XChaCha20)
+    final nonce = sodium.randombytes. buf(nonceSize);
 
-    // Encrypt
-    final ciphertext = sodium. crypto.aead. xchacha20Poly1305Ietf.encrypt(
+    // Use secretBox for authenticated encryption (XSalsa20-Poly1305)
+    // This is the recommended AEAD in sodium_libs
+    final ciphertext = sodium. crypto.secretBox.easy(
       message: plaintext,
       nonce: nonce,
       key: key,
@@ -88,17 +82,18 @@ final class BackupCrypto {
   }) async {
     final sodium = await SodiumLoader.sodium;
 
-    final nonceLen = sodium. crypto.aead. xchacha20Poly1305Ietf.nonceBytes;
+    // secretBox nonce is 24 bytes
+    const nonceLen = 24;
 
     if (encrypted.length <= nonceLen) {
       throw BackupDecryptionException('Encrypted data too short');
     }
 
-    final nonce = encrypted.sublist(0, nonceLen);
+    final nonce = encrypted. sublist(0, nonceLen);
     final ciphertext = encrypted.sublist(nonceLen);
 
     try {
-      return sodium.crypto.aead.xchacha20Poly1305Ietf. decrypt(
+      return sodium.crypto.secretBox.openEasy(
         cipherText: ciphertext,
         nonce:  nonce,
         key: key,
@@ -124,11 +119,10 @@ final class BackupCrypto {
   }
 }
 
-/// Backup decryption exception
 class BackupDecryptionException implements Exception {
   final String message;
 
-  BackupDecryptionException(this.message);
+  BackupDecryptionException(this. message);
 
   @override
   String toString() => 'BackupDecryptionException: $message';
